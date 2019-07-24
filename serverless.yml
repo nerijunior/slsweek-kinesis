@@ -1,0 +1,53 @@
+service: sls-week
+
+plugins:
+  - serverless-webpack
+
+package:
+  individually: true
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: dev
+  region: us-east-2
+
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - kinesis:PutRecord
+        - kinesis:GetRecords
+        - kinesis:GetShardIterator
+        - kinesis:DescribeStream
+        - kinesis:ListStreams
+      Resource:
+        "arn:aws:kinesis:*:*:stream/sls-week-stream"
+
+functions:
+  producer:
+    handler: producer.main
+    events:
+      - http:
+          path: produce/
+          method: post
+
+  consumer:
+    handler: consumer.main
+    events:
+      - stream:
+          type: kinesis
+          arn:
+            Fn::GetAtt:
+              - KinesisStream
+              - Arn
+          batchSize: 1
+          startingPosition: LATEST
+          enabled: true
+
+resources:
+  Resources:
+    KinesisStream:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: sls-week-stream
+        ShardCount: 1
